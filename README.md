@@ -5,6 +5,6 @@
 3. Click generate
 
 #Requirements
-pip install numpy
-pip install Pillow
-pip install requests
+numpy==1.22.3
+Pillow==9.2.0
+requests==2.25.1
