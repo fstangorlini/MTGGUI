@@ -10,6 +10,8 @@
 #Image source
 #https://scryfall.com/docs/api
 
+######################################################################################################
+# Imports
 from dataclasses import dataclass
 import numpy as np
 import os
