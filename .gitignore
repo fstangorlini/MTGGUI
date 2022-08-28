@@ -2,6 +2,7 @@ booster-generator-cockatrice.py
 booster-generator-mtgjson.py
 buy-cards.ipynb
 compile.bat
+study.ipynb
 cache
 __pycache__
 dist

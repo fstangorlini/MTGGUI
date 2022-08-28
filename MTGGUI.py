@@ -19,8 +19,8 @@ import queue
 import threading
 from tkinter.font import BOLD
 from PIL import Image, ImageTk
-from mtgjson import Mtgjson
-from card import Card
+from MTGJson import Mtgjson
+from MTGCard import MTGCard
 
 ######################################################################################################
 # Classes
@@ -85,7 +85,7 @@ class MTGGUI(tk.Frame):
         self.button_prev.config(state='normal')
     
     # populates list of all images once. self.images is a list of images with tuple(small,large)
-    def __populate_image_list__(self, booster:list[Card]):
+    def __populate_image_list__(self, booster:list[MTGCard]):
         self.images.append((self.img_card_back[0],self.img_card_back[1]))
         for card in booster:
             s = card.image.resize(self.corner_card_size)

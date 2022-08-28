@@ -6,7 +6,7 @@ import queue
 import requests
 import zipfile
 from datetime import datetime
-from card import Card
+from MTGCard import MTGCard
 import random
 from PIL import Image
 
@@ -45,17 +45,11 @@ class Mtgjson:
         if set_name not in self.sets:
             #print(f'Set [{set_name}] could not be found.')
             return None
-        with open(self.cache_dir+set_name+self.file_extension, encoding='UTF-8') as f: json_data = json.load(f)
-        card_distribution = {'Basic Land':1,'common':10,'uncommon':3,'rare':1} #15 total
+        with open(self.cache_dir+set_name+self.file_extension, encoding='UTF-8') as f: set_json_data = json.load(f)
+        booster_card_uuids = self.__get_booster__(set_json_data)
         cards_in_booster = []
-        rares = self.__get_cards_by_rarity__('rare',json_data)
-        uncommons = self.__get_cards_by_rarity__('uncommon',json_data)
-        commons = self.__get_cards_by_rarity__('common',json_data)
-        basic_lands = self.__get_cards_by_rarity__('Basic Land', json_data)
-        rc={'rare':rares,'uncommon':uncommons,'common':commons,'Basic Land':basic_lands}
-        for rarity, quantity in card_distribution.items():
-            cards_in_booster.extend(random.sample(self.__get_cards_by_rarity__(rarity,json_data), k=quantity))
-        #self.display(cards_in_booster)
+        for uuid in booster_card_uuids:
+            cards_in_booster.append(MTGCard(list(filter(lambda card: (uuid == card['uuid']), set_json_data['data']['cards']))[0]))
         self.__fetch_images__(cards_in_booster)
         msg = '['+set_name+'] booster generated successfully'
         if self.queue_ is not None: self.queue_.put((1,msg))
@@ -74,17 +68,16 @@ class Mtgjson:
         # Pythonic way
         return list(filter(lambda card: card['name'] == card_name, json_data['data']['cards']))
     
-    def __get_cards_by_rarity__(self, rarity:str, json_data:json):
-        card_list = []
-        #TODO implement mythic
-        if rarity in ['rare','uncommon','common']: 
-            for json_card in list(filter(lambda card: ((card['rarity'] == rarity) and ('Basic Land' not in card['type'])), json_data['data']['cards'])):
-                card_list.append(Card(json_card, self.queue_))
-        if rarity in ['Basic Land']:
-            for json_card in list(filter(lambda card: ('Basic Land' in card['type']), json_data['data']['cards'])):
-                card_list.append(Card(json_card, self.queue_))
-        return card_list
-    
+    def __get_booster__(self, set_json_data:json):
+        boosters = set_json_data['data']['booster']['default']['boosters']
+        booster_contents = random.choices(boosters, weights = [w['weight'] for w in boosters], k=1)[0]['contents']
+        sheets = set_json_data['data']['booster']['default']['sheets']
+        booster_card_uuids = []
+        # Distribution
+        for k, v in booster_contents.items():
+            booster_card_uuids.extend(random.sample(list(sheets[k]['cards'].keys()), counts=[w for w in list(sheets[k]['cards'].values())], k=v))
+        return booster_card_uuids
+
     def __get_generated_booster_images__(self):
         return [self.cache_dir+f for f in os.listdir(self.cache_dir) if f.startswith('booster') and f.endswith(self.file_extension)]
 
@@ -97,7 +90,7 @@ class Mtgjson:
             print(f'Cache size too big. Deleting a few previously generated booster images to save some disk space...')
             self.__delete_oldest_image__()
 
-    def display(self, booster_cards:list[Card]):
+    def display(self, booster_cards:list[MTGCard]):
         if self.queue_ is not None: self.queue_.put((0,'Displaying booster...'))
         if(len(booster_cards)!=15): return False
         img = self.__assemble__(self.__fetch_images__(booster_cards))
@@ -142,7 +135,7 @@ class Mtgjson:
         img = Image.fromarray(img) #PIL
         return img
     
-    def __fetch_images__(self, booster_cards:list[Card]):
+    def __fetch_images__(self, booster_cards:list[MTGCard]):
         card_image_list_as_image = []
         for card in booster_cards:
             card_image_list_as_image.append(card.__get_image__())
