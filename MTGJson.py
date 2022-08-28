@@ -11,7 +11,7 @@ import random
 from PIL import Image
 
 @dataclass
-class Mtgjson:
+class MTGJson:
 
     cache_dir:str
     url:str
