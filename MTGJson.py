@@ -59,11 +59,13 @@ class MTGJson:
         if set_name not in self.sets:
             #print(f'Set [{set_name}] could not be found.')
             return None
+        # read set json file
         with open(self.cache_dir+set_name+self.file_extension, encoding='UTF-8') as f: set_json_data = json.load(f)
+        # get card uuids
         booster_card_uuids = self.__get_booster__(set_json_data)
         cards_in_booster = []
         for uuid in booster_card_uuids:
-            cards_in_booster.append(MTGCard(list(filter(lambda card: (uuid == card['uuid']), set_json_data['data']['cards']))[0]))
+            cards_in_booster.append(MTGCard(list(filter(lambda card: (uuid == card['uuid']), set_json_data['data']['cards']))[0], self.queue_))
         self.__fetch_images__(cards_in_booster)
         msg = '['+set_name+'] booster generated successfully'
         if self.queue_ is not None: self.queue_.put((1,msg))
@@ -81,15 +83,42 @@ class MTGJson:
         '''
         # Pythonic way
         return list(filter(lambda card: card['name'] == card_name, json_data['data']['cards']))
-    
+
     def __get_booster__(self, set_json_data:json):
         boosters = set_json_data['data']['booster']['default']['boosters']
         booster_contents = random.choices(boosters, weights = [w['weight'] for w in boosters], k=1)[0]['contents']
         sheets = set_json_data['data']['booster']['default']['sheets']
         booster_card_uuids = []
-        # Distribution
-        for k, v in booster_contents.items():
-            booster_card_uuids.extend(random.sample(list(sheets[k]['cards'].keys()), counts=[w for w in list(sheets[k]['cards'].values())], k=v))
+
+        # Distribution for older sets
+        if 'basic' not in list(booster_contents.keys()):
+            for k, v in booster_contents.items():
+                if k=='common':
+                    #1 land
+                    lands = list(filter(lambda card: ('Basic Land' in card['type']), set_json_data['data']['cards']))
+                    land = random.sample(lands, k=1)[0]
+                    booster_card_uuids.append(land['uuid'])
+                    #rest common and not land
+                    commons_not_lands = list(filter(lambda card: ((card['rarity']==k) and ('Basic Land' not in card['type'])), set_json_data['data']['cards']))
+                    commons = random.sample(commons_not_lands, k=v-1)
+                    for c in commons:
+                        booster_card_uuids.append(c['uuid'])
+                if k=='uncommon':
+                    uncommons_not_lands = list(filter(lambda card: ((card['rarity']==k) and ('Basic Land' not in card['type'])), set_json_data['data']['cards']))
+                    uncommons = random.sample(uncommons_not_lands, k=v-1)
+                    for u in uncommons:
+                        booster_card_uuids.append(u['uuid'])
+                if k=='rare':
+                    rares_not_lands = list(filter(lambda card: ((card['rarity']==k) and ('Basic Land' not in card['type'])), set_json_data['data']['cards']))
+                    rares = random.sample(rares_not_lands, k=v-1)
+                    for r in rares:
+                        booster_card_uuids.append(r['uuid'])
+        # Distribution for newer sets
+        else:
+            for k, v in booster_contents.items():
+                l = random.sample(list(sheets[k]['cards'].keys()), counts=[w for w in list(sheets[k]['cards'].values())], k=v)
+                booster_card_uuids.extend(l)
+        #print(booster_card_uuids)
         return booster_card_uuids
 
     def __get_generated_booster_images__(self):

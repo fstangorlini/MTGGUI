@@ -19,7 +19,7 @@ import queue
 import threading
 from tkinter.font import BOLD
 from PIL import Image, ImageTk
-from MTGJson import Mtgjson
+from MTGJson import MTGJson
 from MTGCard import MTGCard
 
 ######################################################################################################
@@ -35,7 +35,7 @@ class ThreadedTask(threading.Thread):
         self.set_name = set_name
         
     def run(self):
-        m = Mtgjson(self.queue_)
+        m = MTGJson(self.queue_)
         booster = m.generate_booster(self.set_name)
         if booster is not None: self.queue_.put((2,booster))
         else: self.queue_.put((1,'Error generating booster. Ensure the set code is valid and try again.'))
@@ -51,6 +51,7 @@ class MTGGUI(tk.Frame):
     def __action_button_generate__(self):
         selected_set = self.stringvar_sets.get()
         if selected_set in self.SETS:
+            self.done_processing = False
             self.images.clear()
             self.display_index = 1
             self.__update_images__()
@@ -62,14 +63,14 @@ class MTGGUI(tk.Frame):
     
     # next button action
     def __action_button_next__(self):
-        if self.display_index >= 15: self.display_index = 0
+        if self.display_index >= self.booster_size: self.display_index = 0
         self.display_index+=1
         self.__update_images__()
         return
     
     # previous button action
     def __action_button_prev__(self):
-        if self.display_index <= 1: self.display_index = 16
+        if self.display_index <= 1: self.display_index = self.booster_size+1
         self.display_index-=1
         self.__update_images__()
         return
@@ -101,7 +102,7 @@ class MTGGUI(tk.Frame):
 
     # updates all images into UI labels (left, center, right)
     def __update_images__(self):
-        if(len(self.images)!=17):
+        if not self.done_processing:
             self.__update_image__(self.label_img_mid, self.img_card_back[1])
             self.__update_image__(self.label_img_left, self.img_card_back[0])
             self.__update_image__(self.label_img_right, self.img_card_back[0])
@@ -129,6 +130,8 @@ class MTGGUI(tk.Frame):
             #msg[0]==2 only when booster is generated successfully
             if(msg[0]==2):
                 self.booster = msg[1]
+                self.done_processing = True
+                self.booster_size = len(self.booster)
                 self.__populate_image_list__(self.booster)
                 self.__update_images__()
         return msg
@@ -268,6 +271,7 @@ class MTGGUI(tk.Frame):
         self.img_card_back = Image.open('./res/mtg-card-back.png')
         self.img_card_back = (self.img_card_back.resize(self.corner_card_size),self.img_card_back.resize(self.centered_card_size))
         self.display_index = 1
+        self.done_processing = False
         self.__custom_init__()
         self.__align_elements__()
         self.__post_init__()
