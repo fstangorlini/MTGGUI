@@ -61,13 +61,12 @@ class MTGJson:
             return None
         # read set json file
         with open(self.cache_dir+set_name+self.file_extension, encoding='UTF-8') as f: set_json_data = json.load(f)
-        # get card uuids
-        booster_card_uuids = self.__get_booster__(set_json_data)
-        cards_in_booster = []
-        for uuid in booster_card_uuids:
-            cards_in_booster.append(MTGCard(list(filter(lambda card: (uuid == card['uuid']), set_json_data['data']['cards']))[0], self.queue_))
+        # get cards
+        cards_in_booster = self.__get_booster__(set_json_data)
+        # Fetch images
         self.__fetch_images__(cards_in_booster)
         msg = '['+set_name+'] booster generated successfully'
+        # Notify GUI
         if self.queue_ is not None: self.queue_.put((1,msg))
         print(msg)
         print(f'{cards_in_booster}')
@@ -85,11 +84,17 @@ class MTGJson:
         return list(filter(lambda card: card['name'] == card_name, json_data['data']['cards']))
 
     def __get_booster__(self, set_json_data:json):
+        # Get propper booster distribution with weights from json [data][booster] info
         boosters = set_json_data['data']['booster']['default']['boosters']
         booster_contents = random.choices(boosters, weights = [w['weight'] for w in boosters], k=1)[0]['contents']
+        # Generate cards in correct order
+        key_order = ['basic', 'common', 'uncommon', 'rare', 'rareMythic', 'foil']
+        sorted_booster_contents = {}
+        for key in key_order:
+            if key in booster_contents:
+                sorted_booster_contents[key] = booster_contents[key]
         sheets = set_json_data['data']['booster']['default']['sheets']
-        booster_card_uuids = []
-
+        cards_in_booster = []
         # Distribution for older sets
         if 'basic' not in list(booster_contents.keys()):
             for k, v in booster_contents.items():
@@ -97,29 +102,37 @@ class MTGJson:
                     #1 land
                     lands = list(filter(lambda card: ('Basic Land' in card['type']), set_json_data['data']['cards']))
                     land = random.sample(lands, k=1)[0]
-                    booster_card_uuids.append(land['uuid'])
+                    card = MTGCard(list(filter(lambda card: (land['uuid'] == card['uuid']), set_json_data['data']['cards']))[0], self.queue_)
+                    cards_in_booster.append(card)
                     #rest common and not land
                     commons_not_lands = list(filter(lambda card: ((card['rarity']==k) and ('Basic Land' not in card['type'])), set_json_data['data']['cards']))
                     commons = random.sample(commons_not_lands, k=v-1)
-                    for c in commons:
-                        booster_card_uuids.append(c['uuid'])
+                    for e in commons:
+                        card = MTGCard(list(filter(lambda card: (e['uuid'] == card['uuid']), set_json_data['data']['cards']))[0], self.queue_)
+                        cards_in_booster.append(card)
                 if k=='uncommon':
                     uncommons_not_lands = list(filter(lambda card: ((card['rarity']==k) and ('Basic Land' not in card['type'])), set_json_data['data']['cards']))
                     uncommons = random.sample(uncommons_not_lands, k=v-1)
-                    for u in uncommons:
-                        booster_card_uuids.append(u['uuid'])
+                    for e in uncommons:
+                        card = MTGCard(list(filter(lambda card: (e['uuid'] == card['uuid']), set_json_data['data']['cards']))[0], self.queue_)
+                        cards_in_booster.append(card)
                 if k=='rare':
                     rares_not_lands = list(filter(lambda card: ((card['rarity']==k) and ('Basic Land' not in card['type'])), set_json_data['data']['cards']))
                     rares = random.sample(rares_not_lands, k=v-1)
-                    for r in rares:
-                        booster_card_uuids.append(r['uuid'])
+                    for e in rares:
+                        card = MTGCard(list(filter(lambda card: (e['uuid'] == card['uuid']), set_json_data['data']['cards']))[0], self.queue_)
+                        cards_in_booster.append(card)
         # Distribution for newer sets
         else:
-            for k, v in booster_contents.items():
-                l = random.sample(list(sheets[k]['cards'].keys()), counts=[w for w in list(sheets[k]['cards'].values())], k=v)
-                booster_card_uuids.extend(l)
+            for k, v in sorted_booster_contents.items():
+                uuid_list = random.sample(list(sheets[k]['cards'].keys()), counts=[w for w in list(sheets[k]['cards'].values())], k=v)
+                for uuid in uuid_list:
+                    if k=='foil': is_foil = True
+                    else: is_foil = False
+                    card = MTGCard(list(filter(lambda card: (uuid == card['uuid']), set_json_data['data']['cards']))[0], self.queue_, foil=is_foil)
+                    cards_in_booster.append(card)
         #print(booster_card_uuids)
-        return booster_card_uuids
+        return cards_in_booster
 
     def __get_generated_booster_images__(self):
         return [self.cache_dir+f for f in os.listdir(self.cache_dir) if f.startswith('booster') and f.endswith(self.file_extension)]

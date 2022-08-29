@@ -32,12 +32,14 @@ class MTGCard:
     image_resolution:str
     queue_:queue
     image:Image
+    foil:bool
 
-    def __init__(self, card_json_data:json, queue_:queue=None):
+    def __init__(self, card_json_data:json, queue_:queue=None, foil:bool=False):
         self.image_resolution = 'normal' #small, normal, large, png, art_crop, or border_crop. Defaults to large.
         self.cache_dir_img = './cache/img/'
         self.file_extension = '.png'
         self.queue_ = queue_
+        self.foil = foil
         self.card_print_separator = '--------------------------------------------------'
         if card_json_data is not None:
             self.name = card_json_data['name']
@@ -73,6 +75,7 @@ class MTGCard:
         ret = ret + '\n[Name]\t\t' + self.name
         ret = ret + '\n[Set]\t\t' + self.set
         ret = ret + '\n[Rarity]\t' + self.rarity
+        ret = ret + '\n[Foil]\t\t' + self.foil
         ret = ret + '\n[Url]\t\t' + self.image_url
         ret += '\n'
         ret += self.card_print_separator
@@ -80,4 +83,5 @@ class MTGCard:
         return ret
 
     def __repr__(self):
-        return self.name
+        if self.foil: return '*'+self.name+'*'
+        else: return self.name
