@@ -37,6 +37,7 @@ class MTGCard:
     def __init__(self, card_json_data:json, queue_:queue=None, foil:bool=False):
         self.image_resolution = 'normal' #small, normal, large, png, art_crop, or border_crop. Defaults to large.
         self.cache_dir_img = './cache/img/'
+        self.res_dir = './res/'
         self.file_extension = '.png'
         self.queue_ = queue_
         self.foil = foil
@@ -53,8 +54,9 @@ class MTGCard:
     def __get_image__(self):
         if(os.path.isfile(self.cache_dir_img+self.scryfallId+self.file_extension)):
             img = Image.open(self.cache_dir_img+self.scryfallId+self.file_extension)
-            self.image = img
-            return img
+            if self.foil: self.image = self.__apply_foil__(img)
+            else: self.image = img
+            return self.image
         else:
             print(f'Image [{self.name}] not in cache. Fetching from {self.image_url}',end='. ')
             if self.queue_ is not None: self.queue_.put((0,'Image ['+self.name+'] not in cache. Fetching from '+self.image_url))
@@ -70,12 +72,23 @@ class MTGCard:
             self.image = img
             return img
 
+    def __apply_foil__(self, img):
+        foil_layer = Image.open(self.res_dir+'foil_layer3.png')
+        foil_layer = foil_layer.resize(img.size)
+        foil_layer = foil_layer.convert("RGBA")
+        foil_layer.putalpha(64)
+        img = img.convert("RGBA")
+        foil_image = Image.new("RGBA", img.size)
+        foil_image = Image.alpha_composite(foil_image, img)
+        foil_image = Image.alpha_composite(foil_image, foil_layer)
+        return foil_image
+
     def __str__(self):
         ret = self.card_print_separator
         ret = ret + '\n[Name]\t\t' + self.name
         ret = ret + '\n[Set]\t\t' + self.set
         ret = ret + '\n[Rarity]\t' + self.rarity
-        ret = ret + '\n[Foil]\t\t' + self.foil
+        ret = ret + '\n[Foil]\t\t' + str(self.foil)
         ret = ret + '\n[Url]\t\t' + self.image_url
         ret += '\n'
         ret += self.card_print_separator

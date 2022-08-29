@@ -158,11 +158,11 @@ class MTGGUI(tk.Frame):
         self.textfield_status       = Entry(self.root,width=105,textvariable=self.stringvar_text_status)
         self.progress_label         = Label(self.root,text=self.label_progress,font=("Segoe UI", 10))
         self.progress_bar           = ttk.Progressbar(orient="horizontal",length=self.width, mode="determinate")
-        self.label_sets             = Label(self.root,text='Set',width=7,font=("Segoe UI", 10))
+        self.label_sets             = Label(self.root,text='Set code',width=8,font=("Segoe UI", 10))
         self.label_img_mid          = Label(self.root)
         self.label_img_left         = Label(self.root)
         self.label_img_right        = Label(self.root)
-        self.entry_sets             = Entry(self.root,width=7,textvariable=self.stringvar_sets)
+        self.entry_sets             = Entry(self.root,width=8,textvariable=self.stringvar_sets)
         self.button_generate        = Button(self.root,text='Generate',command=self.__action_button_generate__, width=16)
         self.button_next            = Button(self.root,text='Next',command=self.__action_button_next__, width=16)
         self.button_prev            = Button(self.root,text='Previous',command=self.__action_button_prev__, width=16)
@@ -171,7 +171,7 @@ class MTGGUI(tk.Frame):
         #######################################################################
         # Align elements to grid
         self.label_subtitle.place(x=110,y=10)
-        self.label_sets.place(x=160,y=57)
+        self.label_sets.place(x=140,y=57)
         self.entry_sets.place(x=210,y=60)
         self.button_generate.place(x=290,y=57)
         self.progress_bar.place(x=0,y=self.height-10)

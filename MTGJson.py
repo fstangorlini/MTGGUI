@@ -87,7 +87,7 @@ class MTGJson:
         # Get propper booster distribution with weights from json [data][booster] info
         boosters = set_json_data['data']['booster']['default']['boosters']
         booster_contents = random.choices(boosters, weights = [w['weight'] for w in boosters], k=1)[0]['contents']
-        # Generate cards in correct order
+        # Sets up correct rarity order
         key_order = ['basic', 'common', 'uncommon', 'rare', 'rareMythic', 'foil']
         sorted_booster_contents = {}
         for key in key_order:
