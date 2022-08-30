@@ -65,6 +65,8 @@ class MTGJson:
         cards_in_booster = self.__get_booster__(set_json_data)
         # Fetch images
         self.__fetch_images__(cards_in_booster)
+        msg = 'Fetching prices...'
+        if self.queue_ is not None: self.queue_.put((1,msg))
         self.__fetch_prices__(cards_in_booster)
         msg = '['+set_name+'] booster generated successfully'
         # Notify GUI
