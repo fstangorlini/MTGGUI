@@ -23,14 +23,11 @@ class MTGCard:
     uuid:str
     name:str
     type:str
-    set:str
+    set_code:str
     rarity:str
     scryfallId:str
     image_url:str
-    rarity_converter = {}
-    cache_dir_img:str
     image_resolution:str
-    queue_:queue
     image:Image
     foil:bool
 
@@ -44,7 +41,7 @@ class MTGCard:
         self.card_print_separator = '--------------------------------------------------'
         if card_json_data is not None:
             self.name = card_json_data['name']
-            self.set = card_json_data['setCode']
+            self.set_code = card_json_data['setCode']
             self.scryfallId = card_json_data['identifiers']['scryfallId']
             self.image_url = 'https://api.scryfall.com/cards/'+self.scryfallId+'?format=image&face=front&version='+self.image_resolution
             self.rarity = card_json_data['rarity']
@@ -86,7 +83,7 @@ class MTGCard:
     def __str__(self):
         ret = self.card_print_separator
         ret = ret + '\n[Name]\t\t' + self.name
-        ret = ret + '\n[Set]\t\t' + self.set
+        ret = ret + '\n[Set]\t\t' + self.set_code
         ret = ret + '\n[Rarity]\t' + self.rarity
         ret = ret + '\n[Foil]\t\t' + str(self.foil)
         ret = ret + '\n[Url]\t\t' + self.image_url
@@ -98,3 +95,9 @@ class MTGCard:
     def __repr__(self):
         if self.foil: return '*'+self.name+'*'
         else: return self.name
+
+    def display(self):
+        self.__get_image__()
+        print(self.__str__())
+        self.image.show()
+
