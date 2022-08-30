@@ -108,14 +108,19 @@ class MTGJson:
         if 'basic' not in list(sorted_booster_contents.keys()):
             for k, v in sorted_booster_contents.items():
                 if k=='common':
-                    #1 land
+                    # if there are lands in set
                     lands = list(filter(lambda card: ('Basic Land' in card['type']), set_json_data['data']['cards']))
-                    land = random.sample(lands, k=1)[0]
-                    card = MTGCard(list(filter(lambda card: (land['uuid'] == card['uuid']), set_json_data['data']['cards']))[0], self.queue_)
-                    cards_in_booster.append(card)
-                    #rest common and not land
-                    commons_not_lands = list(filter(lambda card: ((card['rarity']==k) and ('Basic Land' not in card['type'])), set_json_data['data']['cards']))
-                    commons = random.sample(commons_not_lands, k=v-1)
+                    if len(lands)>0:
+                        #1 land
+                        land = random.sample(lands, k=1)[0]
+                        card = MTGCard(list(filter(lambda card: (land['uuid'] == card['uuid']), set_json_data['data']['cards']))[0], self.queue_)
+                        cards_in_booster.append(card)
+                        #rest common and not land
+                        commons_not_lands = list(filter(lambda card: ((card['rarity']==k) and ('Basic Land' not in card['type'])), set_json_data['data']['cards']))
+                        commons = random.sample(commons_not_lands, k=v-1)
+                    else:
+                        commons_not_lands = list(filter(lambda card: ((card['rarity']==k) and ('Basic Land' not in card['type'])), set_json_data['data']['cards']))
+                        commons = random.sample(commons_not_lands, k=v)
                     for e in commons:
                         card = MTGCard(list(filter(lambda card: (e['uuid'] == card['uuid']), set_json_data['data']['cards']))[0], self.queue_)
                         cards_in_booster.append(card)
