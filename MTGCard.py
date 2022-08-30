@@ -45,6 +45,7 @@ class MTGCard:
         self.price = 0.0
         self.card_print_separator = '--------------------------------------------------'
         if card_json_data is not None:
+            self.uuid = card_json_data['uuid']
             self.name = card_json_data['name']
             self.set_code = card_json_data['setCode']
             self.scryfallId = card_json_data['identifiers']['scryfallId']

@@ -24,35 +24,38 @@ from MTGCard import MTGCard
 import random
 from PIL import Image
 
+
 @dataclass
 class MTGJson:
 
-    cache_dir:str
+    cache_dir_meta:str
     url:str
     json_data:json
     sets:list[str]
     queue_:queue
 
     def __init__(self, queue_:queue=None):
-        self.cache_dir = './cache/metadata/'
+        self.cache_dir_meta = './cache/metadata/'
         url_base_pre = 'https://mtgjson.com/api/v5/'
         json_file = 'AllSetFiles.zip'
         self.file_extension = '.json'
+        self.generated_boosters_json = 'boosters.json'
+        self.datetime_format = '%Y-%m-%d %H:%M:%S'
         self.url_composed = url_base_pre+json_file
         self.queue_ = queue_
-        if not os.path.isdir(self.cache_dir):os.makedirs(self.cache_dir)
-        if not os.path.isfile(self.cache_dir+json_file):
+        if not os.path.isdir(self.cache_dir_meta):os.makedirs(self.cache_dir_meta)
+        if not os.path.isfile(self.cache_dir_meta+json_file):
             if self.queue_ is not None: self.queue_.put((0,'Database not found in cache. Downloading...'))
             # Download
             req = requests.get(self.url_composed)
             # save
-            with open(self.cache_dir+json_file,'wb') as output_file:
+            with open(self.cache_dir_meta+json_file,'wb') as output_file:
                 output_file.write(req.content)
             # Unpack
             if self.queue_ is not None: self.queue_.put((0,'Unpacking database...'))
-            with zipfile.ZipFile(self.cache_dir+json_file, 'r') as zip_ref:
-                zip_ref.extractall(self.cache_dir)
-        self.sets = [f[:-len(self.file_extension)] for f in os.listdir(self.cache_dir) if os.path.isfile(os.path.join(self.cache_dir, f)) and f.endswith(self.file_extension)]
+            with zipfile.ZipFile(self.cache_dir_meta+json_file, 'r') as zip_ref:
+                zip_ref.extractall(self.cache_dir_meta)
+        self.sets = [f[:-len(self.file_extension)] for f in os.listdir(self.cache_dir_meta) if os.path.isfile(os.path.join(self.cache_dir_meta, f)) and f.endswith(self.file_extension)]
 
     def generate_booster(self, set_name:str):
         if self.queue_ is not None:  self.queue_.put((0,'Generating a new booster from set ['+set_name+']'))
@@ -60,16 +63,19 @@ class MTGJson:
             #print(f'Set [{set_name}] could not be found.')
             return None
         # read set json file
-        with open(self.cache_dir+set_name+self.file_extension, encoding='UTF-8') as f: set_json_data = json.load(f)
+        with open(self.cache_dir_meta+set_name+self.file_extension, encoding='UTF-8') as f: set_json_data = json.load(f)
         # get cards
         cards_in_booster = self.__get_booster__(set_json_data)
         # Fetch images
         self.__fetch_images__(cards_in_booster)
+        # Fetch all prices
         msg = 'Fetching prices...'
         if self.queue_ is not None: self.queue_.put((1,msg))
         self.__fetch_prices__(cards_in_booster)
-        msg = '['+set_name+'] booster generated successfully'
+        # Save it
+        self.__save_booster_to_json__(cards_in_booster, set_json_data)
         # Notify GUI
+        msg = '['+set_name+'] booster generated successfully'
         if self.queue_ is not None: self.queue_.put((1,msg))
         print(msg)
         print(f'{cards_in_booster}')
@@ -138,7 +144,45 @@ class MTGJson:
         return cards_in_booster
 
     def __get_generated_booster_images__(self):
-        return [self.cache_dir+f for f in os.listdir(self.cache_dir) if f.startswith('booster') and f.endswith(self.file_extension)]
+        return [self.cache_dir_meta+f for f in os.listdir(self.cache_dir_meta) if f.startswith('booster') and f.endswith(self.file_extension)]
+
+    def __save_booster_to_json__(self, booster:list[MTGCard], set_json_data:json):
+        data = {}
+        # If file does not exist, create it
+        if not os.path.isfile(self.cache_dir_meta+self.generated_boosters_json):
+            with open(self.cache_dir_meta+self.generated_boosters_json, 'w') as fp:
+                json.dump(data, fp, indent = 4)
+        # Else, load it
+        else:
+            with open(self.cache_dir_meta+self.generated_boosters_json, 'r') as file:
+                data = json.loads(file.read())
+        # Put newly generated booster to file
+        now = datetime.now().strftime(self.datetime_format)
+        data[now] = self.__get_booster_json__(booster, set_json_data)
+        # Save
+        with open(self.cache_dir_meta+self.generated_boosters_json, 'w') as fp:
+            json.dump(data, fp, indent = 4)
+
+    def __get_booster_json__(self, booster:list[MTGCard], set_json_data:json):
+        booster_json = {}
+        booster_json['set'] = set_json_data['data']['name']
+        booster_json['setCode'] = set_json_data['data']['code']
+        booster_json['releaseDate'] = set_json_data['data']['releaseDate']
+        booster_json['type'] = set_json_data['data']['type']
+        booster_json['cards'] = []
+        accum = 0.0
+        for card in booster:
+            c = {}
+            c['name'] = card.name
+            c['uuid'] = card.uuid
+            c['scryfallId'] = card.scryfallId
+            c['rarity'] = card.rarity
+            c['foil'] = card.foil
+            c['price'] = card.price
+            booster_json['cards'].append(c)
+            accum += card.price
+        booster_json['boosterTotalValue'] = accum
+        return booster_json
 
     def __delete_oldest_image__(self):
         oldest_file = min(self.__get_generated_booster_images__(), key=os.path.getctime)
