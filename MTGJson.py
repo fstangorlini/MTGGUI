@@ -99,8 +99,8 @@ class MTGJson:
         sheets = set_json_data['data']['booster']['default']['sheets']
         cards_in_booster = []
         # Distribution for older sets
-        if 'basic' not in list(booster_contents.keys()):
-            for k, v in booster_contents.items():
+        if 'basic' not in list(sorted_booster_contents.keys()):
+            for k, v in sorted_booster_contents.items():
                 if k=='common':
                     #1 land
                     lands = list(filter(lambda card: ('Basic Land' in card['type']), set_json_data['data']['cards']))
@@ -115,13 +115,13 @@ class MTGJson:
                         cards_in_booster.append(card)
                 if k=='uncommon':
                     uncommons_not_lands = list(filter(lambda card: ((card['rarity']==k) and ('Basic Land' not in card['type'])), set_json_data['data']['cards']))
-                    uncommons = random.sample(uncommons_not_lands, k=v-1)
+                    uncommons = random.sample(uncommons_not_lands, k=v)
                     for e in uncommons:
                         card = MTGCard(list(filter(lambda card: (e['uuid'] == card['uuid']), set_json_data['data']['cards']))[0], self.queue_)
                         cards_in_booster.append(card)
                 if k=='rare':
                     rares_not_lands = list(filter(lambda card: ((card['rarity']==k) and ('Basic Land' not in card['type'])), set_json_data['data']['cards']))
-                    rares = random.sample(rares_not_lands, k=v-1)
+                    rares = random.sample(rares_not_lands, k=v)
                     for e in rares:
                         card = MTGCard(list(filter(lambda card: (e['uuid'] == card['uuid']), set_json_data['data']['cards']))[0], self.queue_)
                         cards_in_booster.append(card)
