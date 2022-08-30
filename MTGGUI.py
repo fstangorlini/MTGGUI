@@ -118,6 +118,12 @@ class MTGGUI(tk.Frame):
         self.textfield_status.insert(0,text)
         self.textfield_status.config(state='disabled')
 
+    def __get_card_prices__(self, booster:list[MTGCard]):
+        total_value = 0.0
+        for card in booster:
+            total_value += card.price
+        return total_value
+
     # process messages on queue (shared with other classes)
     def __process_queue__(self):
         msg = None
@@ -134,6 +140,9 @@ class MTGGUI(tk.Frame):
                 self.booster_size = len(self.booster)
                 self.__populate_image_list__(self.booster)
                 self.__update_images__()
+                msg = 'Total booster worth: $ '+str(self.__get_card_prices__(self.booster))
+                print(msg)
+                self.queue_.put((1,msg))
         return msg
     
     # runs every 100ms to update UI elements

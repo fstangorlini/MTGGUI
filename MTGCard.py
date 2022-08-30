@@ -30,20 +30,26 @@ class MTGCard:
     image_resolution:str
     image:Image
     foil:bool
+    price:float
 
     def __init__(self, card_json_data:json, queue_:queue=None, foil:bool=False):
         self.image_resolution = 'normal' #small, normal, large, png, art_crop, or border_crop. Defaults to large.
         self.cache_dir_img = './cache/img/'
+        self.cache_dir_meta = './cache/metadata/'
         self.res_dir = './res/'
         self.file_extension = '.png'
+        self.prices_json_file = 'prices.json'
+        self.prices_json = None
         self.queue_ = queue_
         self.foil = foil
+        self.price = 0.0
         self.card_print_separator = '--------------------------------------------------'
         if card_json_data is not None:
             self.name = card_json_data['name']
             self.set_code = card_json_data['setCode']
             self.scryfallId = card_json_data['identifiers']['scryfallId']
             self.image_url = 'https://api.scryfall.com/cards/'+self.scryfallId+'?format=image&face=front&version='+self.image_resolution
+            self.price_url = 'https://api.scryfall.com/cards/'+self.scryfallId
             self.rarity = card_json_data['rarity']
             self.type = card_json_data['type']
         if not os.path.isdir(self.cache_dir_img): os.makedirs(self.cache_dir_img)
@@ -69,6 +75,34 @@ class MTGCard:
             self.image = img
             return img
 
+    def __get_price__(self):
+        prices = {}
+        if not os.path.isfile(self.cache_dir_meta+self.prices_json_file):
+            with open(self.cache_dir_meta+self.prices_json_file, 'w') as fp:
+                json.dump(prices, fp, indent = 4)
+        else:
+            with open(self.cache_dir_meta+self.prices_json_file, 'r') as file:
+                prices = json.loads(file.read())
+        # From cache
+        if self.scryfallId in prices:
+            self.prices_json = prices[self.scryfallId]
+        # From API
+        else:
+            card_json = requests.get(self.price_url, stream=True).json()
+            card_json_light = {}
+            card_json_light['usd_foil'] = card_json['prices']['usd_foil']
+            card_json_light['usd'] = card_json['prices']['usd']
+            prices[self.scryfallId] = card_json_light
+            self.prices_json = card_json_light
+            # Save
+            with open(self.cache_dir_meta+self.prices_json_file, 'w') as fp:
+                json.dump(prices, fp, indent = 4)
+        if self.foil: p = self.prices_json['usd_foil']
+        else: p = self.prices_json['usd']
+        if p is not None: self.price = float(p)
+        else: self.price = 0.0
+        return self.price
+
     def __apply_foil__(self, img):
         foil_layer = Image.open(self.res_dir+'foil_layer3.png')
         foil_layer = foil_layer.resize(img.size)
@@ -87,6 +121,7 @@ class MTGCard:
         ret = ret + '\n[Rarity]\t' + self.rarity
         ret = ret + '\n[Foil]\t\t' + str(self.foil)
         ret = ret + '\n[Url]\t\t' + self.image_url
+        ret = ret + '\n[Price]\t' + str(self.price)
         ret += '\n'
         ret += self.card_print_separator
         ret += '\n'
