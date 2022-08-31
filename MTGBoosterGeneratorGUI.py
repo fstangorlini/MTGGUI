@@ -42,7 +42,7 @@ class ThreadedTask(threading.Thread):
 
 ######################################################################################################
 # GUI
-class MTGGUI(tk.Frame):
+class MTGBoosterGeneratorGUI(tk.Frame):
     
     queue_:queue
     image_list:list
@@ -165,9 +165,9 @@ class MTGGUI(tk.Frame):
         self.stringvar_sets         = StringVar()
         self.label_subtitle         = Label(self.root,text=self.SUBTITLE,font=("Segoe UI", 16, BOLD))
         self.textfield_status       = Entry(self.root,width=105,textvariable=self.stringvar_text_status)
-        self.progress_label         = Label(self.root,text=self.label_progress,font=("Segoe UI", 10))
+        #self.progress_label         = Label(self.root,text=self.label_progress,font=("Segoe UI", 10))
         self.progress_bar           = ttk.Progressbar(orient="horizontal",length=self.width, mode="determinate")
-        self.label_sets             = Label(self.root,text='Set code',width=8,font=("Segoe UI", 10))
+        self.label_set_code             = Label(self.root,text='Set code',width=8,font=("Segoe UI", 10))
         self.label_img_mid          = Label(self.root)
         self.label_img_left         = Label(self.root)
         self.label_img_right        = Label(self.root)
@@ -180,7 +180,7 @@ class MTGGUI(tk.Frame):
         #######################################################################
         # Align elements to grid
         self.label_subtitle.place(x=110,y=10)
-        self.label_sets.place(x=140,y=57)
+        self.label_set_code.place(x=140,y=57)
         self.entry_sets.place(x=210,y=60)
         self.button_generate.place(x=290,y=57)
         self.progress_bar.place(x=0,y=self.height-10)
@@ -206,7 +206,7 @@ class MTGGUI(tk.Frame):
         #######################################################################
         # Variables
         self.queue_ = queue_
-        self.root = tk.Tk()
+        self.root = Toplevel()
         super().__init__(self.root)
         self.pack()
         self.images = []
@@ -287,4 +287,4 @@ class MTGGUI(tk.Frame):
        
 # Initialize
 if __name__ == "__main__":
-    g = MTGGUI(queue.Queue())
+    g = MTGBoosterGeneratorGUI(queue.Queue())

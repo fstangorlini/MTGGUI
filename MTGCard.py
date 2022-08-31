@@ -58,14 +58,14 @@ class MTGCard:
     def __get_image__(self):
         if(os.path.isfile(self.cache_dir_img+self.scryfallId+self.file_extension)):
             img = Image.open(self.cache_dir_img+self.scryfallId+self.file_extension)
-            if self.foil: self.image = self.__apply_foil__(img)
-            else: self.image = img
-            return self.image
+            if self.foil:
+                img = self.__apply_foil__(img)
         else:
             print(f'Image [{self.name}] not in cache. Fetching from {self.image_url}',end='. ')
             if self.queue_ is not None: self.queue_.put((0,'Image ['+self.name+'] not in cache. Fetching from '+self.image_url))
             try:
                 img = Image.open(requests.get(self.image_url, stream=True).raw)
+                if self.foil: img = self.__apply_foil__(img)
                 img.save(self.cache_dir_img+self.scryfallId+self.file_extension)
                 print('OK!')
                 if self.queue_ is not None: self.queue_.put((0,'OK!'))
@@ -73,8 +73,8 @@ class MTGCard:
                 print('NOK')
                 if self.queue_ is not None: self.queue_.put((0,'Error downloading...'))
                 img = Image.open('./res/mtg-card-back.png')
-            self.image = img
-            return img
+        self.image = img
+        return img
 
     def __get_price__(self):
         prices = {}
