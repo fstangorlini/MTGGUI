@@ -31,22 +31,28 @@ class MTGCollection:
             set_json = json.loads(file.read())
         return set_json
 
-    def get_collection(self, set_code:str, set_json:json):
-        #loads booster json file
+    def get_booster_json(self):
         with open(self.cache_dir_meta+self.boosters_json_file, 'r') as file:
             boosters_json = json.loads(file.read())
-        #collection = {'setCode':set_code, 'totalWorth':0.0}
+        return boosters_json
+
+    def get_collection(self, set_code:str, set_json:json):
+        #loads booster json file
+        boosters_json = self.get_booster_json()
         collection = {}
         #populate set data
-        for card in set_json['data']['cards']:
-            collection[card['uuid']] = {'collected':False, 'foil':False}
+        for card_json_data in set_json['data']['cards']:
+            card = MTGCard(card_json_data, collected=False)
+            print('adding to collection as not collected')
+            print(card)
+            collection[card_json_data['uuid']] = card
 
         #populate with collected cards
-        for k, v in boosters_json.items():
-            if v['setCode']==set_code:
-                for card in v['cards']:
-                    if not collection[card['uuid']]['foil']:
-                        collection[card['uuid']] = {'collected':True, 'foil':card['foil']}
+        for booster_json in boosters_json.values():
+            if booster_json['setCode']==set_code:
+                for card_data in booster_json['cards']:
+                    if not collection[card_data['uuid']].foil:
+                        collection[card_data['uuid']].collected = True
                     #collection['totalWorth'] = collection['totalWorth'] + card['price']
         return collection
 
@@ -97,10 +103,9 @@ class MTGCollection:
         #card_uuids = card_uuids[(page-1)*page_size:page*page_size]
         card_image_list_as_image = []
         card_back_img = Image.open('./res/mtg-card-back.png').resize(self.card_dimensions).convert("RGB")
-        for uuid, value in collection_data.items():
-            if value['collected']:
-                card = self.get_card_by_uuid(set_json_data,uuid)
-                if value['foil']: card.foil = True
+        for uuid, card in collection_data.items():
+            if card.collected:
+                if card.foil: card.foil = True
                 img = card.__get_image__().convert("RGB")
                 if img.size != self.card_dimensions: img = img.resize(self.card_dimensions)
                 card_image_list_as_image.append(img)

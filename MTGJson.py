@@ -64,13 +64,25 @@ class MTGJson:
             return None
         # read set json file
         with open(self.cache_dir_meta+set_name+self.file_extension, encoding='UTF-8') as f: set_json_data = json.load(f)
+        ###############################################################################
+        # read booster json file
+        if os.path.isfile(self.cache_dir_meta+self.generated_boosters_json):
+            with open(self.cache_dir_meta+self.generated_boosters_json, 'r') as file:
+                booster_json = json.loads(file.read())
+            collected_uuids = []
+            for e in [v for v in list(booster_json.values())]:
+                if e['setCode']==set_name:
+                    for f in e['cards']:
+                        collected_uuids.append(f['uuid'])
+        ###############################################################################
         # get cards
         cards_in_booster = self.__get_booster__(set_json_data)
+        for card in cards_in_booster:
+            if card.uuid not in collected_uuids:
+                card.newly_collected = True
         # Fetch images
         self.__fetch_images__(cards_in_booster)
         # Fetch all prices
-        msg = 'Fetching prices...'
-        if self.queue_ is not None: self.queue_.put((1,msg))
         self.__fetch_prices__(cards_in_booster)
         # Save it
         self.__save_booster_to_json__(cards_in_booster, set_json_data)

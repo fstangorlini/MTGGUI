@@ -31,8 +31,9 @@ class MTGCard:
     image:Image
     foil:bool
     price:float
+    newly_collected:bool
 
-    def __init__(self, card_json_data:json, queue_:queue=None, foil:bool=False):
+    def __init__(self, card_json_data:json, queue_:queue=None, foil:bool=False, collected:bool=True):
         self.image_resolution = 'normal' #small, normal, large, png, art_crop, or border_crop. Defaults to large.
         self.cache_dir_img = './cache/img/'
         self.cache_dir_meta = './cache/metadata/'
@@ -43,6 +44,8 @@ class MTGCard:
         self.queue_ = queue_
         self.foil = foil
         self.price = 0.0
+        self.collected = collected
+        self.newly_collected=False
         self.card_print_separator = '--------------------------------------------------'
         if card_json_data is not None:
             self.uuid = card_json_data['uuid']
@@ -60,19 +63,26 @@ class MTGCard:
             img = Image.open(self.cache_dir_img+self.scryfallId+self.file_extension)
             if self.foil:
                 img = self.__apply_foil__(img)
+            if self.newly_collected:
+                img = self.__apply_new_sticker__(img)
         else:
-            print(f'Image [{self.name}] not in cache. Fetching from {self.image_url}',end='. ')
-            if self.queue_ is not None: self.queue_.put((0,'Image ['+self.name+'] not in cache. Fetching from '+self.image_url))
+            msg = 'Image ['+self.name+'] not in cache. Fetching from '+self.image_url
+            print(msg, end=' ')
+            if self.queue_ is not None: self.queue_.put((0,msg))
             try:
                 img = Image.open(requests.get(self.image_url, stream=True).raw)
                 if self.foil: img = self.__apply_foil__(img)
+                #should not apply new sticker here
                 img.save(self.cache_dir_img+self.scryfallId+self.file_extension)
-                print('OK!')
-                if self.queue_ is not None: self.queue_.put((0,'OK!'))
+                msg = 'OK!'
+                print(msg)
+                if self.queue_ is not None: self.queue_.put((0,msg))
+                if self.newly_collected:
+                    img = self.__apply_new_sticker__(img)
             except:
                 print('NOK')
                 if self.queue_ is not None: self.queue_.put((0,'Error downloading...'))
-                img = Image.open('./res/mtg-card-back.png')
+                img = Image.open('./res/mtg-card-back.png').resize((488,680))
         self.image = img
         return img
 
@@ -89,7 +99,13 @@ class MTGCard:
             self.prices_json = prices[self.scryfallId]
         # From API
         else:
+            msg = 'Price of ['+self.name+'] not in cache. Fetching from '+self.price_url
+            print(msg, end=' ')
+            if self.queue_ is not None: self.queue_.put((0,msg))
             card_json = requests.get(self.price_url, stream=True).json()
+            msg = 'OK!'
+            print(msg)
+            if self.queue_ is not None: self.queue_.put((0,msg))
             card_json_light = {}
             card_json_light['usd_foil'] = card_json['prices']['usd_foil']
             card_json_light['usd'] = card_json['prices']['usd']
@@ -115,6 +131,11 @@ class MTGCard:
         foil_image = Image.alpha_composite(foil_image, foil_layer)
         return foil_image
 
+    def __apply_new_sticker__(self, img):
+        self.new_sticker_img = Image.open(self.res_dir+'new'+self.file_extension).convert('RGBA')
+        img.paste(self.new_sticker_img, (img.size[0]-self.new_sticker_img.size[0],0), self.new_sticker_img)
+        return img
+
     def __str__(self):
         ret = self.card_print_separator
         ret = ret + '\n[Name]\t\t' + self.name
@@ -122,7 +143,8 @@ class MTGCard:
         ret = ret + '\n[Rarity]\t' + self.rarity
         ret = ret + '\n[Foil]\t\t' + str(self.foil)
         ret = ret + '\n[Url]\t\t' + self.image_url
-        ret = ret + '\n[Price]\t' + str(self.price)
+        ret = ret + '\n[Price]\t\t' + str(self.price)
+        ret = ret + '\n[uuid]\t\t' + self.uuid
         ret += '\n'
         ret += self.card_print_separator
         ret += '\n'

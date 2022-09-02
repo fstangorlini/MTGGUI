@@ -122,7 +122,7 @@ class MTGBoosterGeneratorGUI(tk.Frame):
         total_value = 0.0
         for card in booster:
             total_value += card.price
-        return total_value
+        return "{:.2f}".format(total_value)
 
     # process messages on queue (shared with other classes)
     def __process_queue__(self):

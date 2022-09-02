@@ -40,7 +40,7 @@ class ThreadedTask(threading.Thread):
         set_json = c.get_set_json()
         collection = c.get_collection(self.set_code, set_json)
         collection_book_images = c.__generate_collection_book__(collection, set_json)
-        if collection_book_images is not None: self.queue_.put((2,c.page_image_list))
+        if collection_book_images is not None: self.queue_.put((2,(collection, c.page_image_list)))
         else: self.queue_.put((1,'Error viewing Collection. Please try again.'))
 
 ######################################################################################################
@@ -57,7 +57,6 @@ class MTGCollectionsGUI(tk.Frame):
         super().__init__(self.root)
         self.pack()
         self.images = []
-        
         self.TITLE = 'Magic the Gathering - Collection'
         self.SUBTITLE = self.TITLE
         self.SETS = ['10E', '2ED', '2X2', '2XM', '3ED', '40K', '4BB', '4ED', '5DN', 
@@ -152,7 +151,6 @@ class MTGCollectionsGUI(tk.Frame):
             self.display_index+=1
             img = self.collection_book_images[self.display_index]
             self.__update_image__(self.label_img, img)
-
     
     def __action_button_prev__(self):
         if self.display_index > 0:
@@ -173,12 +171,16 @@ class MTGCollectionsGUI(tk.Frame):
         self.textfield_status.insert(0,text)
         self.textfield_status.config(state='disabled')
 
-    def __done_processing__(self, collection_book_images:list):
+    def __done_processing__(self, collection:dict, collection_book_images:list):
         self.done_processing = True
         img = collection_book_images[self.display_index]
         self.__update_image__(self.label_img, img)
         #TODO
-        msg = 'Total booster worth: $ ???'
+        total_worth = 0.0
+        for card in collection.values():
+            if card.collected:
+                total_worth+=card.__get_price__()
+        msg = 'Total collection worth: $ '+str("{:.2f}".format(total_worth))
         print(msg)
         self.queue_.put((1,msg))
 
@@ -193,8 +195,9 @@ class MTGCollectionsGUI(tk.Frame):
                 self.__enable_buttons__()
             #msg[0]==2 only when booster is generated successfully
             if(msg[0]==2):
-                self.collection_book_images = msg[1]
-                self.__done_processing__(self.collection_book_images)
+                self.collection = msg[1][0]
+                self.collection_book_images = msg[1][1]
+                self.__done_processing__(self.collection, self.collection_book_images)
         return msg
     
     # runs every 100ms to update UI elements
