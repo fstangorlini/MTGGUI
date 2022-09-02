@@ -43,8 +43,6 @@ class MTGCollection:
         #populate set data
         for card_json_data in set_json['data']['cards']:
             card = MTGCard(card_json_data, collected=False)
-            print('adding to collection as not collected')
-            print(card)
             collection[card_json_data['uuid']] = card
 
         #populate with collected cards
