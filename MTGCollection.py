@@ -51,7 +51,7 @@ class MTGCollection:
                 for card_data in booster_json['cards']:
                     if not collection[card_data['uuid']].foil:
                         collection[card_data['uuid']].collected = True
-                    #collection['totalWorth'] = collection['totalWorth'] + card['price']
+                        collection[card_data['uuid']].foil = card_data['foil']
         return collection
 
     def __overlay_image__(self, l_img, s_img, x_offset, y_offset):
