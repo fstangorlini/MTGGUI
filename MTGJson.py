@@ -44,7 +44,7 @@ class MTGJson:
         self.url_composed = url_base_pre+json_file
         self.queue_ = queue_
         if not os.path.isdir(self.cache_dir_meta):os.makedirs(self.cache_dir_meta)
-        if not os.path.isfile(self.cache_dir_meta+json_file):
+        if not os.path.isfile(self.cache_dir_meta+json_file) or (os.path.isfile(self.cache_dir_meta+json_file) and time.time() - os.path.getmtime(self.cache_dir_meta+json_file) > (30 * 24 * 60 * 60)):
             if self.queue_ is not None: self.queue_.put((0,'Database not found in cache. Downloading...'))
             # Download
             req = requests.get(self.url_composed)
