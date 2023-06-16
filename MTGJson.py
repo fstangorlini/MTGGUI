@@ -109,7 +109,7 @@ class MTGJson:
         boosters = set_json_data['data']['booster']['default']['boosters']
         booster_contents = random.choices(boosters, weights = [w['weight'] for w in boosters], k=1)[0]['contents']
         # Sets up correct rarity order
-        key_order = ['basic', 'common', 'uncommon', 'rare', 'rareMythic', 'foil']
+        key_order = ['basic', 'common', 'commonWithShowcase', 'uncommon', 'uncommonWithShowcase', 'rare', 'rareMythicWithShowcase', 'rareMythic', 'foil', 'foilWithShowcase']
         sorted_booster_contents = {}
         for key in key_order:
             if key in booster_contents:
