@@ -23,6 +23,7 @@ from datetime import datetime
 from MTGCard import MTGCard
 import random
 from PIL import Image
+import time
 
 
 @dataclass
@@ -34,7 +35,7 @@ class MTGJson:
     sets:list[str]
     queue_:queue
 
-    def __init__(self, queue_:queue=None):
+    def __init__(self, queue_:queue=None, ):
         self.cache_dir_meta = './cache/metadata/'
         url_base_pre = 'https://mtgjson.com/api/v5/'
         json_file = 'AllSetFiles.zip'
@@ -43,9 +44,10 @@ class MTGJson:
         self.datetime_format = '%Y-%m-%d %H:%M:%S'
         self.url_composed = url_base_pre+json_file
         self.queue_ = queue_
+        self.set_json_data = None
         if not os.path.isdir(self.cache_dir_meta):os.makedirs(self.cache_dir_meta)
         if not os.path.isfile(self.cache_dir_meta+json_file) or (os.path.isfile(self.cache_dir_meta+json_file) and time.time() - os.path.getmtime(self.cache_dir_meta+json_file) > (30 * 24 * 60 * 60)):
-            if self.queue_ is not None: self.queue_.put((0,'Database not found in cache. Downloading...'))
+            if self.queue_ is not None:self.queue_.put((0,'Database not found in cache. Downloading...'))
             # Download
             req = requests.get(self.url_composed)
             # save
@@ -57,7 +59,17 @@ class MTGJson:
                 zip_ref.extractall(self.cache_dir_meta)
         self.sets = [f[:-len(self.file_extension)] for f in os.listdir(self.cache_dir_meta) if os.path.isfile(os.path.join(self.cache_dir_meta, f)) and f.endswith(self.file_extension)]
 
-    def generate_booster(self, set_name:str):
+    def get_booster_distribution_values(self, set_name:str)->list[str]:
+        try:
+            with open(self.cache_dir_meta+set_name+self.file_extension, encoding='UTF-8') as f: set_json_data = json.load(f)
+            booster_distributions = []
+            booster_distributions = set_json_data['data']['booster']
+            return booster_distributions
+        except:
+            return None
+
+
+    def generate_booster(self, set_name:str, booster_distribution:str=None):
         if self.queue_ is not None:  self.queue_.put((0,'Generating a new booster from set ['+set_name+']'))
         if set_name not in self.sets:
             #print(f'Set [{set_name}] could not be found.')
@@ -76,7 +88,7 @@ class MTGJson:
                         collected_uuids.append(f['uuid'])
         ###############################################################################
         # get cards
-        cards_in_booster = self.__get_booster__(set_json_data)
+        cards_in_booster = self.__get_booster__(set_json_data, booster_distribution)
         for card in cards_in_booster:
             if card.uuid not in collected_uuids:
                 card.newly_collected = True
@@ -104,9 +116,9 @@ class MTGJson:
         # Pythonic way
         return list(filter(lambda card: card['name'] == card_name, json_data['data']['cards']))
 
-    def __get_booster__(self, set_json_data:json):
+    def __get_booster__(self, set_json_data:json, booster_distribution):
         # Get propper booster distribution with weights from json [data][booster] info
-        boosters = set_json_data['data']['booster']['default']['boosters']
+        boosters = set_json_data['data']['booster'][booster_distribution]['boosters']
         booster_contents = random.choices(boosters, weights = [w['weight'] for w in boosters], k=1)[0]['contents']
         # Sets up correct rarity order
         key_order = ['basic', 'common', 'commonWithShowcase', 'uncommon', 'uncommonWithShowcase', 'rare', 'rareMythicWithShowcase', 'rareMythic', 'foil', 'foilWithShowcase']
@@ -114,7 +126,7 @@ class MTGJson:
         for key in key_order:
             if key in booster_contents:
                 sorted_booster_contents[key] = booster_contents[key]
-        sheets = set_json_data['data']['booster']['default']['sheets']
+        sheets = set_json_data['data']['booster'][booster_distribution]['sheets']
         cards_in_booster = []
         # Distribution for older sets
         if 'basic' not in list(sorted_booster_contents.keys()):
