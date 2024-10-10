@@ -29,14 +29,15 @@ from MTGCard import MTGCard
 # booster generation without freezing up UI
 class ThreadedTask(threading.Thread):
 
-    def __init__(self, queue_:queue, set_name:str):
+    def __init__(self, queue_:queue, mtgjson:object, set_name:str, selected_booster_distribution:str):
         threading.Thread.__init__(self)
         self.queue_ = queue_
         self.set_name = set_name
+        self.mtgjson = mtgjson
+        self.selected_booster_distribution = selected_booster_distribution
         
     def run(self):
-        m = MTGJson(self.queue_)
-        booster = m.generate_booster(self.set_name)
+        booster = self.mtgjson.generate_booster(self.set_name, self.selected_booster_distribution)
         if booster is not None: self.queue_.put((2,booster))
         else: self.queue_.put((1,'Error generating booster. Ensure the set code is valid and try again.'))
 
@@ -46,6 +47,7 @@ class MTGBoosterGeneratorGUI(tk.Frame):
     
     queue_:queue
     image_list:list
+    mtgjson:MTGJson
     
     # generate button action
     def __action_button_generate__(self):
@@ -57,7 +59,7 @@ class MTGBoosterGeneratorGUI(tk.Frame):
             self.__update_images__()
             self.__disable_buttons__()
             self.progress_bar.start()
-            ThreadedTask(self.queue_,selected_set).start()
+            ThreadedTask(self.queue_,self.mtgjson,selected_set, self.combo_booster_distribution.get()).start()
         else:
             self.__put_text_in_status__('Error generating booster. Ensure the set code is valid and try again.')
     
@@ -110,6 +112,11 @@ class MTGBoosterGeneratorGUI(tk.Frame):
             self.__update_image__(self.label_img_mid, self.images[self.display_index][1])
             self.__update_image__(self.label_img_left, self.images[self.display_index-1][0])
             self.__update_image__(self.label_img_right, self.images[self.display_index+1][0])
+
+    def __populate_booster_distributions__(self):
+        booster_distributions = self.mtgjson.get_booster_distribution_values(self.stringvar_sets.get())
+        self.combo_booster_distribution['values'] = [e for e in booster_distributions]
+        self.combo_booster_distribution.current(0)
 
     # puts text into status text field at the bottom
     def __put_text_in_status__(self, text:str):
@@ -167,11 +174,15 @@ class MTGBoosterGeneratorGUI(tk.Frame):
         self.textfield_status       = Entry(self.root,width=105,textvariable=self.stringvar_text_status)
         #self.progress_label         = Label(self.root,text=self.label_progress,font=("Segoe UI", 10))
         self.progress_bar           = ttk.Progressbar(orient="horizontal",length=self.width, mode="determinate")
-        self.label_set_code             = Label(self.root,text='Set code',width=8,font=("Segoe UI", 10))
+        self.label_set_code         = Label(self.root,text='Set code',width=8,font=("Segoe UI", 10))
+        self.combo_booster_distribution_value = StringVar()
+        self.combo_booster_distribution = ttk.Combobox(self.root, state="readonly", textvariable=self.combo_booster_distribution_value)
+        self.combo_booster_distribution['values'] = ('None')
+        self.combo_booster_distribution.current(0)
         self.label_img_mid          = Label(self.root)
         self.label_img_left         = Label(self.root)
         self.label_img_right        = Label(self.root)
-        self.entry_sets             = Entry(self.root,width=8,textvariable=self.stringvar_sets)
+        self.entry_sets             = Entry(self.root,width=8,textvariable=self.stringvar_sets, validate="focusout", validatecommand=self.__populate_booster_distributions__)
         self.button_generate        = Button(self.root,text='Generate',command=self.__action_button_generate__, width=16)
         self.button_next            = Button(self.root,text='Next',command=self.__action_button_next__, width=16)
         self.button_prev            = Button(self.root,text='Previous',command=self.__action_button_prev__, width=16)
@@ -180,9 +191,10 @@ class MTGBoosterGeneratorGUI(tk.Frame):
         #######################################################################
         # Align elements to grid
         self.label_subtitle.place(x=110,y=10)
-        self.label_set_code.place(x=140,y=57)
-        self.entry_sets.place(x=210,y=60)
-        self.button_generate.place(x=290,y=57)
+        self.label_set_code.place(x=40,y=57)
+        self.entry_sets.place(x=110,y=60)
+        self.combo_booster_distribution.place(x=180,y=60)
+        self.button_generate.place(x=330,y=57)
         self.progress_bar.place(x=0,y=self.height-10)
         self.textfield_status.place(x=0,y=self.height-30)
         self.label_img_mid.place(x=150,y=100)
@@ -199,6 +211,7 @@ class MTGBoosterGeneratorGUI(tk.Frame):
         self.button_next.config(state='disabled')
         self.button_prev.config(state='disabled')
         self.__update_images__()
+        self.__populate_booster_distributions__()
         self.root.after(100, self.__update_root__)
         self.root.mainloop()
 
@@ -217,67 +230,13 @@ class MTGBoosterGeneratorGUI(tk.Frame):
         self.GEOMETRY = str(self.width)+'x'+str(self.height)
         self.TITLE = 'Magic the Gathering - Booster Generator'
         self.SUBTITLE = self.TITLE
-        self.SETS = ['10E', '2ED', '2X2', '2XM', '30A', '3ED', '40K', '4BB', '4ED', '5DN', '5ED', '6ED', '7ED', 
-                     '8ED', '9ED', 'A25', 'AAFR', 'ABRO', 'ACLB', 'ADMU', 'AER', 'AFC', 'AFR', 'AJMP', 'AKH', 'AKHM', 
-                     'AKR', 'ALA', 'ALL', 'ALTR', 'AMH1', 'AMH2', 'AMID', 'AMOM', 'ANA', 'ANB', 'ANEO', 'AONE', 
-                     'APC', 'ARB', 'ARC', 'ARN', 'ASNC', 'ASTX', 'ATH', 'ATQ', 'AVOW', 'AVR', 'AZNR', 'BBD', 
-                     'BCHR', 'BFZ', 'BNG', 'BOK', 'boosters', 'BOT', 'BRB', 'BRC', 'BRO', 'BRR', 'BTD', 'C13', 
-                     'C14', 'C15', 'C16', 'C17', 'C18', 'C19', 'C20', 'C21', 'CC1', 'CC2', 'CED', 'CEI', 'CHK', 
-                     'CHR', 'CLB', 'CM1', 'CM2', 'CMA', 'CMB1', 'CMB2', 'CMD', 'CMM', 'CMR', 'CN2', 'CNS', 'CON_', 
-                     'CP1', 'CP2', 'CP3', 'CSP', 'CST', 'DBL', 'DD1', 'DD2', 'DDC', 'DDD', 'DDE', 'DDF', 'DDG', 
-                     'DDH', 'DDI', 'DDJ', 'DDK', 'DDL', 'DDM', 'DDN', 'DDO', 'DDP', 'DDQ', 'DDR', 'DDS', 'DDT', 
-                     'DDU', 'DGM', 'DIS', 'DKA', 'DKM', 'DMC', 'DMR', 'DMU', 'DOM', 'DPA', 'DRB', 'DRK', 'DST', 
-                     'DTK', 'DVD', 'E01', 'E02', 'EA1', 'EA2', 'ELD', 'EMA', 'EMN', 'EVE', 'EVG', 'EXO', 'EXP', 
-                     'F01', 'F02', 'F03', 'F04', 'F05', 'F06', 'F07', 'F08', 'F09', 'F10', 'F11', 'F12', 'F13', 
-                     'F14', 'F15', 'F16', 'F17', 'F18', 'FBB', 'FBRO', 'FDMU', 'FEM', 'FJ22', 'FJMP', 'FMB1', 'FMOM', 
-                     'FNM', 'FONE', 'FRF', 'FUT', 'G00', 'G01', 'G02', 'G03', 'G04', 'G05', 'G06', 'G07', 'G08', 'G09', 
-                     'G10', 'G11', 'G17', 'G18', 'G99', 'GDY', 'GK1', 'GK2', 'GN2', 'GN3', 'GNT', 'GPT', 'GRN', 'GS1', 
-                     'GTC', 'GVL', 'H09', 'H17', 'H1R', 'HA1', 'HA2', 'HA3', 'HA4', 'HA5', 'HA6', 'HBG', 'HHO', 'HML', 
-                     'HOP', 'HOU', 'HTR16', 'HTR17', 'HTR18', 'HTR19', 'HTR20', 'ICE', 'IKO', 'IMA', 'INV', 'ISD', 'ITP', 
-                     'J12', 'J13', 'J14', 'J15', 'J16', 'J17', 'J18', 'J19', 'J20', 'J21', 'J22', 'JGP', 'JMP', 'JOU', 
-                     'JUD', 'JVC', 'KHC', 'KHM', 'KLD', 'KLR', 'KTK', 'L12', 'L13', 'L14', 'L15', 'L16', 'L17', 'LEA', 
-                     'LEB', 'LEG', 'LGN', 'LRW', 'LTC', 'LTR', 'M10', 'M11', 'M12', 'M13', 'M14', 'M15', 'M19', 'M20', 
-                     'M21', 'MAFR', 'MAT', 'MB1', 'MBRO', 'MBS', 'MCLB', 'MD1', 'MDMU', 'ME1', 'ME2', 'ME3', 'ME4', 
-                     'MED', 'MGB', 'MH1', 'MH2', 'MIC', 'MID', 'MIR', 'MKHM', 'MM2', 'MM3', 'MMA', 'MMH2', 'MMID', 
-                     'MMQ', 'MNEO', 'MOC', 'MOM', 'MONE', 'MOR', 'MP2', 'MPR', 'MPS', 'MRD', 'MSNC', 'MSTX', 'MUL', 
-                     'MVOW', 'MZNR', 'NCC', 'NEC', 'NEM', 'NEO', 'NPH', 'O90P', 'OAFC', 'OANA', 'OARC', 'OC13', 'OC14', 
-                     'OC15', 'OC16', 'OC17', 'OC18', 'OC19', 'OC20', 'OC21', 'OCM1', 'OCMD', 'ODY', 'OE01', 'OGW', 
-                     'OHOP', 'OLEP', 'OLGC', 'OMIC', 'ONC', 'ONE', 'ONS', 'OPC2', 'OPCA', 'ORI', 'OVNT', 'OVOC', 'P02', 
-                     'P03', 'P04', 'P05', 'P06', 'P07', 'P08', 'P09', 'P10', 'P10E', 'P11', 'P15A', 'P22', 'P23', 
-                     'P2HG', 'P30A', 'P30H', 'P5DN', 'P8ED', 'P9ED', 'PAER', 'PAFR', 'PAKH', 'PAL00', 'PAL01', 'PAL02', 
-                     'PAL03', 'PAL04', 'PAL05', 'PAL06', 'PAL99', 'PALA', 'PALP', 'PANA', 'PAPC', 'PARB', 'PARC', 
-                     'PARL', 'PAST', 'PAVR', 'PBBD', 'PBFZ', 'PBNG', 'PBOK', 'PBOOK', 'PBRO', 'PC2', 'PCA', 'PCEL', 
-                     'PCHK', 'PCLB', 'PCMD', 'PCMP', 'PCNS', 'PCON', 'PCSP', 'PCTB', 'PCY', 'PD2', 'PD3', 'PDCI', 
-                     'PDGM', 'PDIS', 'PDKA', 'PDMU', 'PDOM', 'PDP10', 'PDP12', 'PDP13', 'PDP14', 'PDP15', 'PDRC', 
-                     'PDST', 'PDTK', 'PDTP', 'PELD', 'PELP', 'PEMN', 'PEVE', 'PEWK', 'PEXO', 'PF19', 'PF20', 'PF21', 
-                     'PF23', 'PFRF', 'PFUT', 'PG07', 'PG08', 'PGPT', 'PGPX', 'PGRN', 'PGRU', 'PGTC', 'PGTW', 'PH17', 
-                     'PH18', 'PH19', 'PH20', 'PH21', 'PHED', 'PHEL', 'PHJ', 'PHOP', 'PHOU', 'PHPR', 'PHTR', 'PHUK', 
-                     'PI13', 'PI14', 'PIDW', 'PIKO', 'PINV', 'PISD', 'PJ21', 'PJAS', 'PJJT', 'PJOU', 'PJSE', 'PJUD', 
-                     'PKHM', 'PKLD', 'PKTK', 'PL21', 'PL22', 'PL23', 'PLC', 'PLG20', 'PLG21', 'PLG22', 'PLGM', 'PLGN', 
-                     'PLIST', 'PLNY', 'PLRW', 'PLS', 'PM10', 'PM11', 'PM12', 'PM13', 'PM14', 'PM15', 'PM19', 'PM20', 
-                     'PM21', 'PMBS', 'PMEI', 'PMH1', 'PMH2', 'PMIC', 'PMID', 'PMMQ', 'PMOA', 'PMOM', 'PMOR', 'PMPS', 
-                     'PMPS06', 'PMPS07', 'PMPS08', 'PMPS09', 'PMPS10', 'PMPS11', 'PMRD', 'PNAT', 'PNCC', 'PNEM', 'PNEO', 
-                     'PNPH', 'PODY', 'POGW', 'PONE', 'PONS', 'POR', 'PORI', 'PPC1', 'PPCY', 'PPLC', 'PPLS', 'PPP1', 
-                     'PPRO', 'PPTK', 'PR2', 'PR23', 'PRAV', 'PRCQ', 'PRED', 'PRES', 'prices', 'PRIX', 'PRM', 'PRNA', 
-                     'PROE', 'PRTR', 'PRW2', 'PRWK', 'PS11', 'PS14', 'PS15', 'PS16', 'PS17', 'PS18', 'PS19', 'PSAL', 
-                     'PSCG', 'PSDC', 'PSDG', 'PSHM', 'PSNC', 'PSOI', 'PSOK', 'PSOM', 'PSS1', 'PSS2', 'PSS3', 'PSTH', 
-                     'PSTX', 'PSUM', 'PSUS', 'PSVC', 'PTC', 'PTG', 'PTHB', 'PTHS', 'PTK', 'PTKDF', 'PTMP', 'PTOR', 
-                     'PTSNC', 'PTSP', 'PUDS', 'PULG', 'PUMA', 'PUNH', 'PURL', 'PUSG', 'PUST', 'PVAN', 'PVOW', 'PW09', 
-                     'PW10', 'PW11', 'PW12', 'PW21', 'PW22', 'PW23', 'PWAR', 'PWCS', 'PWOR', 'PWOS', 'PWPN', 'PWWK', 
-                     'PXLN', 'PXTC', 'PZ1', 'PZ2', 'PZEN', 'PZNR', 'Q06', 'Q07', 'Q08', 'RAV', 'REN', 'RIN', 'RIX', 'RNA', 
-                     'ROE', 'RQS', 'RTR', 'S00', 'S99', 'SBRO', 'SCD', 'SCG', 'SCH', 'SHM', 'SIR', 'SIS', 'SKHM', 'SLC', 
-                     'SLD', 'SLP', 'SLU', 'SLX', 'SMID', 'SMOM', 'SNC', 'SNEO', 'SOI', 'SOK', 'SOM', 'SS1', 'SS2', 'SS3', 
-                     'SSTX', 'STA', 'STH', 'STX', 'SUM', 'SUNF', 'SVOW', 'SZNR', 'TBTH', 'TD0', 'TD2', 'TDAG', 'TFTH', 
-                     'THB', 'THP1', 'THP2', 'THP3', 'THS', 'TMP', 'TOR', 'TPR', 'TSB', 'TSP', 'TSR', 'UDS', 'UGIN', 'UGL', 
-                     'ULG', 'UMA', 'UND', 'UNF', 'UNH', 'UPLIST', 'USG', 'UST', 'V09', 'V10', 'V11', 'V12', 'V13', 'V14', 
-                     'V15', 'V16', 'V17', 'VIS', 'VMA', 'VOC', 'VOW', 'W16', 'W17', 'WAR', 'WC00', 'WC01', 'WC02', 'WC03', 
-                     'WC04', 'WC97', 'WC98', 'WC99', 'WDMU', 'WHO', 'WMC', 'WMOM', 'WONE', 'WTH', 'WWK', 'XANA', 'XLN', 
-                     'YBRO', 'YDMU', 'YMID', 'YNEO', 'YONE', 'YSNC', 'ZEN', 'ZNC', 'ZNE', 'ZNR']
+        self.SETS = ['FFDN', 'FDN', 'ADSK', 'TDSK', 'DSC', 'DSK', 'TDSC', 'PDSK', 'YBLB', 'PLG24', 'TBLB', 'PBLB', 'TBLC', 'ABLB', 'MB2', 'PCBB', 'BLB', 'BLC', 'AACR', 'ACR','TACR','PMH3','SMH3','M3C','MH3','TMH3','TM3C','AMH3','H2R','YOTJ','POTJ','TOTJ','AOTJ','TOTP','OTJ','BIG','OTC','TOTC','OTP','TBIG','PIP','TPIP','YMKM','FCLU','CLU','PSS4','TMKC','PMKM','TMKM','AMKM','MKC','MKM','WMKM','PL24','RVR','TRVR','PW24','PF24','YLCI','SPG','PLCI','ALCI','TLCC','TREX','REX','LCI','TLCI','PMAT','SLCI','LCC','TWHO','WHO','YWOE','PWOE','WOC','WOT','TWOC','TWOE','WWOE','AWOE','PMDA','PTSR','WOE','P30T','ACMM','TCMM','CMM','PH22','HA7','EA3','PF23','PLTR','LTC','TLTR','ALTR','LTR','TLTC','FLTR','MAT','FMOM','TMOC','PMOM','TMOM','AMOM','SMOM','TMUL','MOC','WMOM','MOM','MUL','SIS','SIR','YONE','SLP','DA1','PL23','PONE','TONE','TONC','ONE','FONE','ONC','AONE','MONE','WONE','DMR','TDMR','PR23','P23','PW23','YBRO','EA2','TSCD','SCD','FJ22','J22','30A','T30A','PEWK','BRC','BRR','PBRO','TBOT','BOT','PTBRO','BRO','SBRO','MBRO','TBRC','TBRO','FBRO','ABRO','SLC','TGN3','GN3','ULST','UNF','TUNF','SUNF','40K','T40K','YDMU','PRCQ','P30H','PDMU','PTDMU','FDMU','ADMU','DMC','TDMC','DMU','TDMU','WDMU','MDMU','P30M','P30A','PH21','PSVC','EA1','HA6','SCH','2X2','T2X2','HBG','PLG22','PCLB','MCLB','TCLB','CLB','ACLB','YSNC','PTSNC','PNCC','TSNC','SNC','NCC','PSNC','MSNC','ASNC','TNCC','GDY','Q07','YNEO','PW22','SLX','PL22','PNEO','MNEO','SNEO','TNEO','TNEC','NEO','NEC','ANEO','CC2','DBL','P22','YMID','PVOW','TVOW','TVOC','OVOC','MVOW','SVOW','AVOW','VOC','VOW','Q06','SMID','AMID','MIC','TMIC','TMID','PMID','OMIC','MMID','MID','J21','CMB2','PH20','PAFR','OAFC','AAFR','AFC','TAFC','TAFR','MAFR','AFR','PLG21','TMH2','AMH2','PMH2','MMH2','MH2','PW21','H1R','HA5','PSTX','TSTX','TC21','SSTX','MSTX','STA','C21','ASTX','OC21','STX','TTSR','TSR','HA4','PKHM','MKHM','SKHM','KHM','AKHM','TKHC','TKHM','KHC','PL21','PJ21','CC1','TCMR','PCMR','CMR','KLR','PLST','PZNR','TZNC','MZNR','ZNR','AZNR','SZNR','ZNE','ZNC','TZNR','AKR','ANB','2XM','T2XM','PH19','AJMP','JMP','PM21','TM21','M21','SS3','FJMP','SLU','HA3','PLG20','PIKO','IKO','TIKO','OC20','C20','TC20','HA2','TUND','UND','PTHB','TTHB','THB','PF20','J20','SLD','HA1','TGN2','GN2','CMB1','PTG','PELD','ELD','PWCS','TELD','OC19','C19','TC19','PH18','PS19','PPP1','PM20','TM20','M20','SS2','PMH1','MH1','AMH1','TMH1','PWAR','TWAR','WAR','J19','PRW2','GK2','TGK2','PRNA','RNA','TRNA','PF19','OPCA','PUMA','TUMA','UMA','GNT','G18','PRWK','TGK1','GK1','PGRN','TGRN','GRN','MED','TMED','OC18','C18','TC18','PH17','PS18','XANA','ANA','PANA','OANA','PM19','TM19','M19','PSS3','GS1','SS1','PBBD','TBBD','BBD','CM2','TCM2','PDOM','TDOM','DOM','DDU','TDDU','A25','TA25','PLNY','PNAT','TRIX','PRIX','RIX','J18','F18','PUST','TUST','UST','TIMA','PXTC','V17','E02','IMA','DDT','TDDT','G17','PXLN','XLN','TXLN','PSS2','H17','PHTR','TE01','OC17','TC17','C17','PS17','PHOU','HOU','THOU','OE01','E01','TCMA','CMA','PAKH','AKH','TAKH','MP2','W17','DDS','TDDS','TMM3','MM3','PAER','TAER','AER','L17','F17','J17','PCA','TPCA','PZ2','OC16','C16','TC16','PS16','PKLD','KLD','TKLD','MPS','DDR','CN2','TCN2','V16','PEMN','EMN','TEMN','EMA','TEMA','PSOI','TSOI','SOI','W16','DDQ','OGW','TOGW','POGW','L16','J16','F16','PZ1','TC15','C15','OC15','PBFZ','TBFZ','BFZ','PSS1','EXP','DDP','V15','CP3','PORI','ORI','TORI','PS15','MM2','TMM2','TPR','PTKDF','PDTK','DTK','TDTK','DDO','PFRF','CP2','TFRF','FRF','UGIN','L15','F15','J15','TJVC','TDVD','TGVL','GVL','EVG','TEVG','JVC','DVD','OC14','C14','TC14','PKTK','TKTK','KTK','DDN','V14','TM15','CP1','M15','PM15','PPC1','PDP15','PS14','VMA','PCNS','TCNS','CNS','TMD1','MD1','TDAG','THP3','TJOU','JOU','PJOU','TDDM','DDM','TBTH','BNG','THP2','TBNG','PBNG','L14','J14','F14','OC13','C13','TFTH','THS','THP1','TTHS','PTHS','TDDL','DDL','V13','M14','TM14','PM14','PSDC','TMMA','MMA','DGM','TDGM','PDGM','WMC','TDDK','DDK','GTC','TGTC','PGTC','PDP14','L13','F13','J13','OCM1','CM1','RTR','PRTR','TRTR','DDJ','TDDJ','V12','M13','TM13','PM13','OPC2','PC2','AVR','TAVR','PHEL','PAVR','DDI','TDDI','DKA','TDKA','PDKA','PW12','PDP13','PIDW','L12','J12','F12','PD3','ISD','TISD','PISD','TDDH','DDH','V11','TM12','M12','PM12','OCMD','PCMD','CMD','TD2','TNPH','NPH','PNPH','DDG','TDDG','MBS','TMBS','PMBS','ME4','PMPS11','PDP12','PW11','OLGC','PS11','P11','G11','F11','PD2','TD0','SOM','TSOM','PSOM','TDDF','DDF','V10','M11','TM11','PM11','OARC','ARC','DPA','PROE','TROE','ROE','TDDE','DDE','PWWK','WWK','TWWK','PDP10','PMPS10','P10','F10','G10','H09','DDD','TDDD','PZEN','TZEN','ZEN','ME3','OHOP','HOP','PHOP','V09','TM10','M10','PM10','PARB','TARB','ARB','TDDC','DDC','PURL','PCON','TCON','CON','PBOOK','PDTP','PMPS09','F09','G09','P09','TDD2','DD2','PALA','ALA','TALA','ME2','DRB','PEVE','EVE','TEVE','PSHM','TSHM','SHM','P15A','PMOR','MOR','TMOR','PMPS08','P08','G08','F08','DD1','TDD1','PLRW','LRW','TLRW','ME1','10E','P10E','T10E','PFUT','FUT','PGPX','PPRO','PPLC','PLC','PRES','PMPS07','F07','P07','G07','HHO','PTSP','TSB','TSP','PCSP','CST','CSP','PDIS','DIS','PCMP','PGPT','GPT','PAL06','PMPS06','PJAS','P06','G06','F06','PDCI','PHUK','P2HG','PRAV','RAV','PSAL','P9ED','9ED','PSOK','SOK','PBOK','BOK','PMPS','PAL05','PJSE','G05','F05','P05','PUNH','UNH','PCHK','CHK','WC04','PMRD','P5DN','5DN','PDST','DST','PAL04','F04','G04','P04','MRD','WC03','P8ED','8ED','PSCG','SCG','PLGN','LGN','PMOA','PJJT','PAL03','F03','P03','G03','OVNT','ONS','PONS','WC02','PHJ','PRM','PJUD','JUD','PTOR','TOR','PAL02','PR2','G02','F02','DKM','PODY','ODY','WC01','PSDG','PAPC','APC','7ED','PPLS','PLS','PAL01','MPR','F01','G01','PINV','INV','BTD','WC00','PPCY','PCY','S00','PNEM','NEM','PELP','PAL00','G00','FNM','PSUS','BRB','PMMQ','MMQ','PWOS','PWOR','WC99','PGRU','S99','PUDS','UDS','PPTK','PTK','6ED','PULG','ULG','PAL99','G99','ATH','PUSG','USG','PALP','WC98','TUGL','UGL','P02','PEXO','EXO','PSTH','STH','JGP','PTMP','TMP','WC97','WTH','OLEP','POR','PVAN','PMIC','PAST','5ED','VIS','ITP','MGB','MIR','PRED','PCEL','PARL','RQS','PLGM','ALL','PTC','O90P','HML','REN','RIN','CHR','BCHR','ICE','4BB','4ED','PMEI','FEM','PHPR','DRK','PDRC','SUM','LEG','3ED','FBB','ATQ','ARN','CEI','CED','2ED','LEB','LEA']
         self.label_progress = 'Progress'
         self.img_card_back = Image.open('./res/mtg-card-back.png')
         self.img_card_back = (self.img_card_back.resize(self.corner_card_size),self.img_card_back.resize(self.centered_card_size))
         self.display_index = 1
         self.done_processing = False
+        self.mtgjson = MTGJson(self.queue_)
         self.__custom_init__()
         self.__align_elements__()
         self.__post_init__()
